@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SBM.Core;
+using SBM.Core.DTOs;
 using SBM.Core.Models;
-using SBM.Repository;
 
 namespace SBM.API.Controllers
 {
@@ -10,92 +11,58 @@ namespace SBM.API.Controllers
     [ApiController]
     public class ProductsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IProductService _productService;
 
-        public ProductsController(AppDbContext context)
+        public ProductsController(IProductService genericServiceProduct)
         {
-            _context = context;
+            _productService = genericServiceProduct;
+        }
+
+        /// <summary>
+        /// Tüm ürünleri getirir.
+        /// </summary>
+        ///  <remarks>
+        /// Product tablosundan tüm  isDeleted=false işaretlenmiş dataları getirir.
+        /// </remarks>
+        /// <returns></returns>
+        [HttpGet]
+        public async Task<IActionResult> Get()
+        {
+            var products = await _productService.Where(x => x.Id > 0).ToListAsync();
+
+            var productDtos = new List<ProductDto>();
+
+            products.ForEach(x => productDtos.Add(new ProductDto(x)));
+
+            return Ok(productDtos);
+        }
+
+        /// <summary>
+        /// tüm ürümler ile beraber category bilgisini getirir.
+        /// </summary>
+        /// <remarks>
+        /// Bu ürün kaydedildiğini external system için kayıt oluşur
+        /// </remarks>
+        /// <response code='200'>Ürün veritabanından başarılı bir şekilde alınır.</response>
+        /// <response code='404'>İstenen ürün veritabanında yoktur.</response>
+        /// <returns></returns>
+        [HttpGet("ProductsWithCategory")]
+        [Produces("application/json")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ProductsWithCategory()
+        {
+            return Ok(await _productService.GetProductsWithCategoryAsync());
         }
 
         [HttpPost]
-        public IActionResult Save()
+        public async Task<IActionResult> Save(ProductDto productDto)
         {
-            var category = new Category() { Name = "Kalemler" };
+            throw new Exception("veritabanı bağlantısı");
+            var newProduct = new Product() { Name = productDto.Name, Price = productDto.Price, Stock = productDto.Stock, Barcode = Guid.NewGuid().ToString(), CategoryId = productDto.CategoryId };
+            var product = await _productService.AddAsync(newProduct);
 
-            category.Products.Add(new() { Name = "kalem 1", Price = 200, Stock = 300, Barcode = "abc", Number = 1 });
-
-            var product = new Product() { Name = "Kitap 1", Price = 200, Stock = 300, Barcode = "abc", Number = 1 };
-
-            product.Category = new Category() { Name = "Kitaplar" };
-
-            _context.Products.Add(product);
-            _context.Categories.Add(category);
-
-            _context.SaveChanges();
-
-            return Ok();
-        }
-
-        [HttpGet("EagerLoading")]
-        public IActionResult EagerLoading()
-        {
-            var categoryWithProducts = _context.Categories.Include(x => x.Products).ToList();
-
-            var productsWithCategory = _context.Products.Include(x => x.Category).ToList();
-
-            return Ok();
-        }
-
-        [HttpGet("ExplicitLoading")]
-        public IActionResult ExplicitLoading()
-        {
-            var product = _context.Products.First();
-            _context.Entry(product).Reference(x => x.Category).Load();
-            var category = _context.Categories.First();
-            //  var products = _context.Products.Where(x => x.CategoryId == category.Id).ToList();
-
-            _context.Entry(category).Collection(x => x.Products).Query().Where(x => x.Stock > 100).Load();
-
-            return Ok();
-        }
-
-        [HttpGet("LazyLoading")]
-        public IActionResult LazyLoading()
-        {
-            var categories = _context.Categories.ToList();
-            // N+1  problem
-            categories.ForEach(x =>
-            {
-                var veri = "abc";
-                var products = x.Products;
-            });
-
-            return Ok();
-        }
-
-        [HttpGet("State")]
-        public IActionResult State()
-        {
-            //  var category = _context.Categories.First();
-
-            //var OneState = _context.Entry(category).State;
-
-            // category.Name = "Kalemler 10";
-
-            //var TwoState = _context.Entry(category).State;
-
-            //_context.SaveChanges();
-
-            //var ThreeState = _context.Entry(category).State;
-            var category = new Category() { Id = 1, Name = "Kitaplar 10" };
-
-            var state = _context.Entry(category).State;
-
-            _context.Categories.Update(category);
-            var state2 = _context.Entry(category).State;
-
-            _context.SaveChanges();
-            return Ok();
+            return Ok(ProductDto.ProductToDto(product));
         }
     }
 }

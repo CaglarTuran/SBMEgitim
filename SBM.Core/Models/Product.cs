@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
@@ -24,6 +25,8 @@ namespace SBM.Core.Models
         public string Barcode { get; set; }
 
         public int CategoryId { get; set; }
+
+        public Byte[] RowVersion { get; set; }
 
         public virtual Category Category { get; set; }
     }
